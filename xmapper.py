@@ -1,6 +1,7 @@
 import wmi
 import socket
 import speedtest
+import subprocess
 
 st = speedtest.Speedtest()
 
@@ -12,25 +13,21 @@ upload_speed = st.upload()
 download_speed = round(download_speed / (10**6), 2)
 upload_speed = round(upload_speed / (10**6), 2)
 
-import os, re
-# run the arp -a command and get the output as a string
-arp_output = os.popen('arp -a').read()
-# split the output by lines and filter out the empty ones
-arp_lines = list(filter(None, arp_output.split('\n')))
-# loop through the lines and extract the IP and MAC addresses using regular expressions
-devices = []
-for line in arp_lines:
-    # skip the lines that do not contain an IP address
-    if not re.search(r'\d+\.\d+\.\d+\.\d+', line):
-        continue
-    # find the IP address and the MAC address in the line
-    ip_match = re.search(r'\d+\.\d+\.\d+\.\d+', line)
-    mac_match = re.search(r'[0-9a-fA-F]{2}(-[0-9a-fA-F]{2}){5}', line)
-    # check if the matches are not None before calling the group () method
-    if ip_match and mac_match:
-        # append a tuple of IP and MAC to the devices list
-        devices.append((ip_match.group(), mac_match.group()))
-# print the number of devices and their IP and MAC addresses
+def get_connected_device_count():
+    # Execute the ARP command and capture the output
+    arp_output = subprocess.check_output(['arp', '-a']).decode('utf-8')
+
+    # Count the number of unique MAC addresses in the ARP output
+    mac_addresses = set()
+    for line in arp_output.splitlines():
+        if 'dynamic' in line.lower():
+            mac_address = line.split()[1]
+            mac_addresses.add(mac_address)
+
+    return len(mac_addresses)
+
+# Get the count of connected devices
+device_count = get_connected_device_count()
 
 def get_network_details():
     c = wmi.WMI()
@@ -54,7 +51,6 @@ def get_network_details():
             print(f"DHCP Server: {interface.DHCPServer}")
             print(f"DHCP Lease Obtained: {interface.DHCPLeaseObtained}")
             print(f"DHCP Lease Expires: {interface.DHCPLeaseExpires}")
-            print(f"IP Connection Metric: {interface.IPConnectionMetric}")
             print(f"IP Enabled: {interface.IPEnabled}")
             print(f"IP Connection Metric: {interface.IPConnectionMetric}")
             print(f"IP Subnet: {interface.IPSubnet}")
@@ -67,10 +63,8 @@ def get_network_details():
             print(f"Latency: {best_server['latency']} ms")
             print(f"Download speed: {download_speed} Mbps")
             print(f"Upload speed: {upload_speed} Mbps")
-            print(f"There are {len(devices)} devices connected to the network:")
-            for device in devices:
-                print(f"IP: {device[0]}, MAC: {device[1]}")
-                print()
+            print(f"Number of devices connected to the network: {device_count}")
+            print()
 
             hostname = socket.gethostname()
             print(f"Hostname: {hostname}")
@@ -116,12 +110,11 @@ def get_network_details():
             file.write(f"Latency: {best_server['latency']} ms\n")
             file.write(f"Download speed: {download_speed} Mbps\n")
             file.write(f"Upload speed: {upload_speed} Mbps\n")
-            file.write(f"There are {len(devices)} devices connected to the network:")
-            for device in devices:
-                file.write(f"IP: {device[0]}, MAC: {device[1]}")
-
+            file.write(f"Number of devices connected to the network: {device_count}")
     print(f"Network details saved.")
 
 # Get network details and save to a file
 XMapper = get_network_details()
 
+
+        
